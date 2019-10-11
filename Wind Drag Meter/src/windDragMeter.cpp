@@ -50,10 +50,10 @@ void loop() {
   // Print angles
   Serial.print("AngleX= ");
   Serial.println(x);
-  Serial.print("AngleY= ");
-  Serial.println(y);
-  Serial.print("AngleZ= ");
-  Serial.println(z);
+  //Serial.print("AngleY=   ");
+  //Serial.println(y);
+  //Serial.print("AngleZ= ");
+  //Serial.println(z);
 
   // Change RGB LED colors based on angles
   analogWrite(red_light_pin, map(x, 0, 360, 0, 255));
@@ -61,5 +61,5 @@ void loop() {
   analogWrite(blue_light_pin, map(z, 0, 360, 0, 255));
 
   Serial.println("-----------------------------------------");
-  delay(500);
+  delay(1000);
 }
