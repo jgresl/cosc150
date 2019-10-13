@@ -68,7 +68,7 @@ void setup() {
   // Set the accelerometer full scale range (+/- 2, 4, 8, or 16 g)
   imu.setAccelFSR(2);
 
-  // Set the magnetometer full scale range (+/- 4912 uT-micro-tesla's)
+  // The magnetometer full scale range is preset to +/- 4912 uT (micro-tesla's)
 
   // Set the digital low-pass filter of the accelerometer and gyroscope (88, 98, 42, 20, 10, or 5 Hz)
   imu.setLPF(5);
