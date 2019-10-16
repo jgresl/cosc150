@@ -9,6 +9,7 @@
 #define SCREEN_HEIGHT 64    // OLED display height, in pixels
 #define BUTTON_PIN    10    // Button for changing screens
 #define OLED_RESET    -1    // No reset pin on OLED display
+#define VBATPIN       A7    // Voltage pin to determine battery life
 
 // Declare SSD1306 display connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -16,27 +17,34 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // Declare MPU-9250 IMU device (gyrometer, accelerometer, and magnometer)
 MPU9250_DMP imu;
 
-// Declare all functions used in the program
-void printSerialMonitor();
-void printVelocity();
-void printWeather();
-void printBatteryLife();
+// Declare main functions of program
+void printWindDrag();
+void printCrankPower();
+void printCrankCadence();
+void printWheelCadence();
+void printGroundSpeed();
+void printWindSpeed();
+void printTemperature();
+void printAirPressure();
+void printAltitude();
+void printSlope();
+void printCompassHeading();
 void printTimeElapsed();
+void printBatteryLife();
+
+// Declare raw data functions
+void printRawDataScreen();
 void printAccelerometer();
 void printGyroscope();
 void printMagnetometer();
 
 // Declare global variables
 int screen = 0;
-float accelX;
-float accelY;
-float accelZ;
-float gyroX;
-float gyroY;
-float gyroZ;
-float magX;
-float magY;
-float magZ;
+float accelX, accelY, accelZ;
+float gyroX, gyroY, gyroZ;
+float magX, magY, magZ;
+float batteryPrevious;
+bool isCharging;
 
 void setup() {
   Serial.begin(115200);
@@ -78,6 +86,12 @@ void setup() {
 
   // Set the compass sample rate (1Hz to 100Hz)
   imu.setCompassSampleRate(10);
+
+  // Calculate starting battery life
+  batteryPrevious = analogRead(VBATPIN);
+  batteryPrevious *= 2;    // Adafruit divided by 2, so multiply back
+  batteryPrevious *= 3.3;  // Multiply by 3.3V, the reference voltage
+  batteryPrevious /= 1024; // Convert to voltage
 }
 
 void loop() {
@@ -87,109 +101,243 @@ void loop() {
   switch(screen) {
     case 0:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printSerialMonitor();
+      printWindDrag();
       break;
     case 1:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printVelocity();
+      printCrankPower();
       break;
     case 2:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printWeather();
+      printCrankCadence();
       break;
     case 3:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printBatteryLife();
+      printWheelCadence();
       break;
     case 4:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printTimeElapsed();
+      printGroundSpeed();
       break;
     case 5:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printAccelerometer();
+      printWindSpeed();
       break;
     case 6:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printGyroscope();
+      printTemperature();
       break;
     case 7:
       while(digitalRead(BUTTON_PIN) == LOW) {}
-      printMagnetometer();
+      printAirPressure();
       break;
     case 8:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printAltitude();
+      break;
+    case 9:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printSlope();
+      break;
+    case 10:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printCompassHeading();
+      break;
+    case 11:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printTimeElapsed();
+      break;
+    case 12:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printBatteryLife();
+      break;
+    case 13:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printRawDataScreen();
+      break;
+    case 14:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printAccelerometer();
+      break;
+    case 15:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printGyroscope();
+      break;
+    case 16:
+      while(digitalRead(BUTTON_PIN) == LOW) {}
+      printMagnetometer();
+      break;
+    case 17:
       while(digitalRead(BUTTON_PIN) == LOW) {}
       screen = 0;
       break;
   }
 }
 
-void printSerialMonitor() {
-  // Get acceleration, gyro, and magnetism values from sensor
-  if (imu.dataReady()) {
-    imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
-  }
-  
-  // Calculate acceleration, gyro, and magnetism
-  accelX = imu.calcAccel(imu.ax);
-  accelY = imu.calcAccel(imu.ay);
-  accelZ = imu.calcAccel(imu.az);
-  gyroX = imu.calcGyro(imu.gx);
-  gyroY = imu.calcGyro(imu.gy);
-  gyroZ = imu.calcGyro(imu.gz);
-  magX = imu.calcMag(imu.mx);
-  magY = imu.calcMag(imu.my);
-  magZ = imu.calcMag(imu.mz);
-
-  // Display serial mode on OLED
+void printWindDrag() {
+  // Display velocity on OLED
   display.clearDisplay();
   display.setCursor(0, 0);
+  display.println("Wind Drag");
   display.println();
-  display.println("Serial");
-  display.println("Monitor");
+  display.println("0.00 CdA");
   display.display();
-
-  // Display values in serial monitor  
-  Serial.println("Accel: " + String(accelX) + ", " + String(accelY) + ", " + String(accelZ) + " g");
-  Serial.println("Gyro: " + String(gyroX) + ", " + String(gyroY) + ", " + String(gyroZ) + " dps");
-  Serial.println("Mag: " + String(magX) + ", " + String(magY) + ", " + String(magZ) + " uT");
-  Serial.println("Time: " + String(imu.time) + " ms");
-  Serial.println();
 }
 
-void printVelocity() {
+void printCrankPower() {
+  // Display velocity on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Power");
+  display.println();
+  display.println("0 watts");
+  display.display();
+}
+
+void printCrankCadence() {
+  // Display velocity on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Crank RPM");
+  display.println();
+  display.println("0 rpm");
+  display.display();
+}
+
+void printWheelCadence() {
+  // Display velocity on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Wheel RPM");
+  display.println();
+  display.println("0 rpm");
+  display.display();
+}
+
+void printGroundSpeed() {
   // Display velocity on OLED
   display.clearDisplay();
   display.setCursor(0, 0);
   display.println("Speed");
   display.println();
-  display.println("0 km/h");
+  display.println("0.0 km/h");
   display.display();
 }
 
-void printWeather() {
+void printWindSpeed() {
+  // Display velocity on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Wind Speed");
+  display.println();
+  display.println("0.0 km/h");
+  display.display();
+}
+
+void printTemperature() {
   // Display weather on OLED
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.println("Weather");
+  display.println("Temp");
   display.println();
-  display.print("10");
-  display.print((char)247);
+  display.print("21");
+  display.print((char) 247);
   display.print("C  ");
-  display.print("52");
-  display.print((char)247);
+  display.print("70");
+  display.print((char) 247);
   display.println("F");
   display.display();
 }
 
-void printBatteryLife() {
-  // Display battery life on OLED
+void printAirPressure() {
+  // Display velocity on OLED
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.println("Battery");
+  display.println("Pressure");
   display.println();
-  display.println("82%");
+  display.println("0 hPa");
   display.display();
+}
+
+void printAltitude() {
+  // Display velocity on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Altitude");
+  display.println();
+  display.println("0 m");
+  display.display();
+}
+
+void printSlope() {
+  // Get values from acceleromter
+  if (imu.dataReady()) {
+    imu.update(UPDATE_ACCEL);
+  }
+
+  // Calculate values to (g)
+  accelX = imu.calcAccel(imu.ax);
+  accelY = imu.calcAccel(imu.ay);
+  accelZ = imu.calcAccel(imu.az);
+
+  // Display values on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Slope");
+  display.println();
+  display.print((int) (accelX * 90));
+  display.print((char) 247);
+  display.display();
+}
+
+void printCompassHeading() {
+  // Get values from magnetometer (compass)
+  if (imu.dataReady()) {
+    imu.update(UPDATE_COMPASS);
+  }
+
+  // Convert values to (uT)
+  magX = imu.calcMag(imu.mx);
+  magY = imu.calcMag(imu.my);
+  magZ = imu.calcMag(imu.mz);
+
+  // Calculate 0-360 degree angle
+  float angle = (atan2(imu.my, imu.mx) * 180) / PI;
+  angle = map(angle, 9, 69, 0, 360);
+  int degrees = constrain(((int) angle + 360) % 360, 0, 360);
+
+  // Determine heading
+  String heading;
+  if (degrees < 33.75)
+    heading = "N";
+  else if (degrees < 67.5)
+    heading = "NE";
+  else if (degrees < 112.5)
+    heading = "E";
+  else if (degrees < 157.5)
+    heading = "SE";
+  else if (degrees < 202.5)
+    heading = "S";
+  else if (degrees < 247.5)
+    heading = "SW";
+  else if (degrees < 292.5)
+    heading = "W";
+  else if (degrees < 337.25)
+    heading = "NW";
+   else
+    heading = "N";
+
+  // Display values on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Heading");
+  display.println();
+  display.print(degrees);
+  display.print((char)247);
+  display.print(" " + heading);
+  display.display();
+
+  delay(200);
 }
 
 void printTimeElapsed() {
@@ -212,6 +360,48 @@ void printTimeElapsed() {
   display.print("m ");
   display.print(ss);
   display.println("s ");
+  display.display();
+}
+
+void printBatteryLife() {
+  // Calculate current battery life
+  float batteryNow = analogRead(VBATPIN);
+  batteryNow *= 2;    // Adafruit divided by 2, so multiply back
+  batteryNow *= 3.3;  // Multiply by 3.3V, the reference voltage
+  batteryNow /= 1024; // Convert to voltage
+  float batteryPercent = constrain(map(batteryNow * 100, 310, 420, 0, 100), 0 , 100);
+
+  if (batteryNow > batteryPrevious + 0.01) {
+    isCharging = true;
+  } else if (batteryNow < batteryPrevious - 0.015) {
+    isCharging = false;
+  }
+
+  // Display battery life on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Battery");
+  display.print(batteryNow);
+  display.println(" v");
+  display.print((int) batteryPercent);
+  display.println("%");
+  if (isCharging) {
+    display.print("Charging");
+  } 
+  display.display();
+  delay(1000);
+
+  // Store current battery life
+  batteryPrevious = batteryNow;
+}
+
+void printRawDataScreen() {
+  // Display battery life on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println();
+  display.println("Raw Data");
+  display.println("Screens");
   display.display();
 }
 
