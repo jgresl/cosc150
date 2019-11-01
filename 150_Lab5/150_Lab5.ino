@@ -8,7 +8,7 @@ IRrecv irrecv(11);
 Servo myservo;
 
 // Declare global variables
-int servo_position = 0;
+int servo_position = 90;
 decode_results results;
 
 void setup(){
