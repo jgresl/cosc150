@@ -4,6 +4,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <SparkFunMPU9250-DMP.h>
+#include <RadioHead.h>
 
 #define SCREEN_WIDTH  128   // OLED display width, in pixels
 #define SCREEN_HEIGHT 64    // OLED display height, in pixels
@@ -45,6 +46,7 @@ float gyroX, gyroY, gyroZ;
 float magX, magY, magZ;
 float batteryPrevious;
 bool isCharging;
+int sampleCount, transmissionCount;
 
 void setup() {
   Serial.begin(115200);
