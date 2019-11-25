@@ -8,6 +8,19 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <SparkFunMPU9250-DMP.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+Adafruit_BME280 bme;
+
+
+float V_0 = 5.0; 
+float rho = 1.204; 
+int offset = 0;
+int offset_size = 10;
+int veloc_mean_size = 20;
+int zero_span = 2;
 
 /* Feather M0 TFT display wiring configurations */
 #define STMPE_CS 6
@@ -97,7 +110,14 @@ void setup()
       Serial.println();
       delay(5000);
     }
+  if(!bme.begin(0x76)){
+      Serial.println("Could not find a valid BME280 Sensor, check wiring!");
+      while(1);
   }
+  for (int ii=0;ii<offset_size;ii++){
+    offset += analogRead(A0)-(1023/2);
+  }
+  offset /= offset_size;
 
   // Enable all MPU-9250 sensors:
   imu.setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
@@ -118,6 +138,7 @@ void setup()
 
   // Set the compass sample rate (1Hz to 100Hz)
   imu.setCompassSampleRate(10);
+}
 }
 
 void loop()
@@ -224,11 +245,11 @@ void printSensorValues()
 }
 
 int getTemperature() {
-  return 21;
+  return bme.readTemperature();
 }
 
 int getPressure() {
-  return 95000;
+  return bme,readPressure()/100;
 }
 
 int getAltitude() {
@@ -242,14 +263,28 @@ int getSlope() {
 }
 
 int getAirSpeed() {
-  int airSpeedAnalog = analogRead(A1);
-  int airSpeed=sqrt((2 * airSpeedAnalog) / 1.225);
-  return airSpeed;
+  
+  float adc_avg = 0; float veloc = 0.0;
+  
+  for (int ii=0;ii<veloc_mean_size;ii++){
+    adc_avg+= analogRead(A0)-offset;
+  }
+  adc_avg/=veloc_mean_size;
+  
+  
+  if (adc_avg>512-zero_span and adc_avg<512+zero_span){
+  } else{
+    if (adc_avg<512){
+      veloc = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
+    } else{
+      veloc = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
+    }
+  }
+  return veloc;
 }
 
 int getHumidity() {
-  int humidity = 50;
-  return humidity;
+  return bme.readHumidity();
 }
 
 int getTime() {
