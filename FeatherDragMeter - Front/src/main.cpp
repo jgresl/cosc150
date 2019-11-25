@@ -11,17 +11,6 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 
-#define SEALEVELPRESSURE_HPA (1013.25)
-Adafruit_BME280 bme;
-
-
-float V_0 = 5.0; 
-float rho = 1.204; 
-int offset = 0;
-int offset_size = 10;
-int veloc_mean_size = 20;
-int zero_span = 2;
-
 /* Feather M0 TFT display wiring configurations */
 #define STMPE_CS 6
 #define TFT_CS 9
@@ -46,6 +35,9 @@ int zero_span = 2;
 #define RF95_RESTRANSMIT_RETRIES 3   //                            (Default = 3)
 #define RF95_RESTRANSMIT_TIMEOUT 500 //                            (Default = 200 ms)
 #define RF95_GATEWAY_ID 100          // Assign unique ID to gateway
+
+/* Constants */
+#define SEALEVELPRESSURE_HPA 1013.25
 
 /* Declare functions */
 void initialize_radio();
@@ -76,17 +68,22 @@ RH_RF95 rf95(RF95_CHIP_SELECT_PIN, RF95_INTERRUPT_PIN);
 //RHReliableDatagram manager(rf95);
 
 /* Create instance of BME280 sensor */
-//Adafruit_BMP280 bmp;
+Adafruit_BME280 bme;
 
-// Declare MPU-9250 IMU device (gyrometer, accelerometer, and magnometer)
+/* Declare MPU-9250 IMU device (gyrometer, accelerometer, and magnometer) */
 MPU9250_DMP imu;
 
 /* Gloabal variables */
 float batteryVoltage;
 int batteryPercent;
+float V_0 = 5.0; 
+float rho = 1.204; 
+int offset = 0;
+int offset_size = 10;
+int veloc_mean_size = 20;
+int zero_span = 2;
 
-void setup()
-{
+void setup() {
   /* Initialize the real time clock */
   rtc.begin();
 
@@ -97,7 +94,7 @@ void setup()
   initialize_radio();
 
   /* Begin BMP280 sensor */
-  //bmp.begin(0x76);
+  bme.begin(0x76);
 
   /* Begin Airspeed Sensor */
   pinMode(A0, INPUT);
@@ -110,11 +107,9 @@ void setup()
       Serial.println();
       delay(5000);
     }
-  if(!bme.begin(0x76)){
-      Serial.println("Could not find a valid BME280 Sensor, check wiring!");
-      while(1);
-  }
-  for (int ii=0;ii<offset_size;ii++){
+  }  
+
+  for (int i = 0; i < offset_size; i++) {
     offset += analogRead(A0)-(1023/2);
   }
   offset /= offset_size;
@@ -139,10 +134,8 @@ void setup()
   // Set the compass sample rate (1Hz to 100Hz)
   imu.setCompassSampleRate(10);
 }
-}
 
-void loop()
-{
+void loop() {
   uint8_t totalSeconds = rtc.getHours() * 3600 + rtc.getMinutes() * 60 + rtc.getSeconds();
 
   // Get values from acceleromter
@@ -151,8 +144,7 @@ void loop()
   }
 
   /* Update display every 5 seconds */
-  if (totalSeconds % 1 == 0)
-  {
+  if (totalSeconds % 1 == 0) {
     printSensorValues();
   }
 
@@ -160,8 +152,7 @@ void loop()
   delay(1000);
 }
 
-void initialize_radio()
-{
+void initialize_radio() {
   /* Manual reset on radio module */
   pinMode(RF95_RESET_PIN, OUTPUT);
   digitalWrite(RF95_RESET_PIN, LOW);
@@ -171,8 +162,7 @@ void initialize_radio()
   void print_setup();
 }
 
-void printSensorValues()
-{
+void printSensorValues() {
   tft.setRotation(1);
   tft.fillScreen(ILI9341_BLACK);
   
@@ -190,14 +180,19 @@ void printSensorValues()
 
   // Line 1
   tft.setTextColor(ILI9341_GREEN);
-  tft.println(" Temp   Pressure  Altitude\n");
+  tft.print(" Temp   Pressure  Altitude");
   tft.setTextColor(ILI9341_WHITE);
-  tft.print(" ");
+
+  tft.setCursor(15, 30);
   tft.print(getTemperature());
   tft.print((char)247);
-  tft.print("C   ");
+  tft.print(" C");
+
+  tft.setCursor(95, 30);
   tft.print(getPressure());
-  tft.print(" Pa  ");
+  tft.print(" Pa"); 
+
+  tft.setCursor(215, 30);
   tft.print(getAltitude());
   tft.print(" m\n\n");
   
@@ -205,13 +200,17 @@ void printSensorValues()
   tft.setTextColor(ILI9341_GREEN);
   tft.println(" Slope  Airspeed  Humidity\n");
   tft.setTextColor(ILI9341_WHITE);
-  tft.print(" ");
+
+  tft.setCursor(15, 90);
   tft.print(getSlope());
   tft.print((char) 247);
-  tft.print("    ");
+
+
+  tft.setCursor(95, 90);
   tft.print(getAirSpeed());
-  tft.print("m/s");
-  tft.print("     ");
+  tft.print(" m/s");
+  
+  tft.setCursor(215, 90);
   tft.print(getHumidity());
   tft.println("%\n");
 
@@ -219,13 +218,16 @@ void printSensorValues()
   tft.setTextColor(ILI9341_GREEN);
   tft.println(" Time   Elapsed   Cadence\n");
   tft.setTextColor(ILI9341_WHITE);
-  tft.print(" ");
+  
+  tft.setCursor(15, 150);
   tft.print(getTime());
   tft.print((char) 247);
-  tft.print("    ");
+  
+  tft.setCursor(95, 150);
   tft.print(getAirSpeed());
   tft.print(" km/h");
-  tft.print("   ");
+  
+  tft.setCursor(215, 150);
   tft.print(getCadence());
   tft.println(" rpm\n");
 
@@ -233,13 +235,15 @@ void printSensorValues()
   tft.setTextColor(ILI9341_GREEN);
   tft.println(" cDa    Velocity  Power\n");
   tft.setTextColor(ILI9341_WHITE);
-  tft.print(" ");
+  
+  tft.setCursor(15, 210);
   tft.print(getCDA());
-  tft.print((char) 247);
-  tft.print("    ");
+  
+  tft.setCursor(95, 210);
   tft.print(getVelocity());
   tft.print(" km/h");
-  tft.print("    ");
+
+  tft.setCursor(215, 210);
   tft.print(getPower());
   tft.println(" w");
 }
@@ -249,7 +253,7 @@ int getTemperature() {
 }
 
 int getPressure() {
-  return bme,readPressure()/100;
+  return bme.readPressure()/100;
 }
 
 int getAltitude() {
