@@ -7,7 +7,6 @@
 #include <rtcZero.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
-#include <Adafruit_BMP280.h>
 #include <SparkFunMPU9250-DMP.h>
 
 /* Feather M0 TFT display wiring configurations */
@@ -38,6 +37,18 @@
 /* Declare functions */
 void initialize_radio();
 void printSensorValues();
+int getTemperature();
+int getPressure();
+int getAltitude();
+int getSlope();
+int getAirSpeed();
+int getHumidity();
+int getTime();
+int getElapsed();
+int getCadence();
+int getCDA();
+int getVelocity();
+int getPower();
 
 /* Create instance of TFT display */
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
@@ -51,8 +62,8 @@ RH_RF95 rf95(RF95_CHIP_SELECT_PIN, RF95_INTERRUPT_PIN);
 /* Create instance of the packet manager */
 //RHReliableDatagram manager(rf95);
 
-/* Create instance of BMP280 sensor */
-Adafruit_BMP280 bmp;
+/* Create instance of BME280 sensor */
+//Adafruit_BMP280 bmp;
 
 // Declare MPU-9250 IMU device (gyrometer, accelerometer, and magnometer)
 MPU9250_DMP imu;
@@ -73,7 +84,7 @@ void setup()
   initialize_radio();
 
   /* Begin BMP280 sensor */
-  bmp.begin(0x76);
+  //bmp.begin(0x76);
 
   /* Begin Airspeed Sensor */
   pinMode(A0, INPUT);
@@ -107,8 +118,6 @@ void setup()
 
   // Set the compass sample rate (1Hz to 100Hz)
   imu.setCompassSampleRate(10);
-
-  // 
 }
 
 void loop()
@@ -160,35 +169,29 @@ void printSensorValues()
 
   // Line 1
   tft.setTextColor(ILI9341_GREEN);
-  tft.print(" Temp   ");
-  tft.print("Pressure  ");
-  tft.println("Altitude\n");
+  tft.println(" Temp   Pressure  Altitude\n");
   tft.setTextColor(ILI9341_WHITE);
   tft.print(" ");
-  tft.print((int)bmp.readTemperature());
+  tft.print(getTemperature());
   tft.print((char)247);
   tft.print("C   ");
-  tft.print((int)bmp.readPressure());
+  tft.print(getPressure());
   tft.print(" Pa  ");
-  tft.print((int)bmp.readAltitude(1013.25)); /* Adjusted to local forecast! */
+  tft.print(getAltitude());
   tft.print(" m\n\n");
-  float accelX = imu.calcAccel(imu.ax);
   
   // Line 2
   tft.setTextColor(ILI9341_GREEN);
   tft.println(" Slope  Airspeed  Humidity\n");
   tft.setTextColor(ILI9341_WHITE);
   tft.print(" ");
-  tft.print((int) (accelX * 90));
+  tft.print(getSlope());
   tft.print((char) 247);
   tft.print("    ");
-  int airSpeedAnalog = analogRead(A1);
-  int airSpeed=sqrt((2 * airSpeedAnalog) / 1.225);
-  tft.print(airSpeed);
+  tft.print(getAirSpeed());
   tft.print("m/s");
-  int humidityPercent = 37;
   tft.print("     ");
-  tft.print(humidityPercent);
+  tft.print(getHumidity());
   tft.println("%\n");
 
   // Line 3
@@ -196,13 +199,13 @@ void printSensorValues()
   tft.println(" Time   Elapsed   Cadence\n");
   tft.setTextColor(ILI9341_WHITE);
   tft.print(" ");
-  tft.print((int) (accelX * 90));
+  tft.print(getTime());
   tft.print((char) 247);
   tft.print("    ");
-  tft.print(airSpeed);
+  tft.print(getAirSpeed());
   tft.print(" km/h");
   tft.print("   ");
-  tft.print(rtc.getSeconds());
+  tft.print(getCadence());
   tft.println(" rpm\n");
 
   // Line 4
@@ -210,12 +213,66 @@ void printSensorValues()
   tft.println(" cDa    Velocity  Power\n");
   tft.setTextColor(ILI9341_WHITE);
   tft.print(" ");
-  tft.print((int) (accelX * 90));
+  tft.print(getCDA());
   tft.print((char) 247);
   tft.print("    ");
-  tft.print(25);
+  tft.print(getVelocity());
   tft.print(" km/h");
   tft.print("    ");
-  tft.print(300);
+  tft.print(getPower());
   tft.println(" w");
+}
+
+int getTemperature() {
+  return 21;
+}
+
+int getPressure() {
+  return 95000;
+}
+
+int getAltitude() {
+  return 530;
+}
+
+int getSlope() {
+  int accelX = imu.calcAccel(imu.ax);
+  int slope = accelX * 90;
+  return slope;
+}
+
+int getAirSpeed() {
+  int airSpeedAnalog = analogRead(A1);
+  int airSpeed=sqrt((2 * airSpeedAnalog) / 1.225);
+  return airSpeed;
+}
+
+int getHumidity() {
+  int humidity = 50;
+  return humidity;
+}
+
+int getTime() {
+  return 1;
+}
+
+int getElapsed() {
+  int elapsed = rtc.getSeconds();
+  return elapsed;
+}
+
+int getCadence() {
+  return 60;
+}
+
+int getCDA() {
+  return  50;
+}
+
+int getVelocity() {
+  return 30;
+}
+
+int getPower() {
+  return 600;
 }
