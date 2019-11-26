@@ -2,8 +2,6 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <RH_RF95.h>
-#include <RHReliableDatagram.h>
-#include <string.h>
 #include <rtcZero.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
@@ -11,19 +9,19 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 
-/* Feather M0 TFT display wiring configurations */
+// Feather M0 TFT display wiring configurations
 #define STMPE_CS 6
 #define TFT_CS 9
 #define TFT_DC 10
 #define SD_CS 5
 
-/* Feather M0 wiring configurations */
+// Feather M0 wiring configurations
 #define RF95_CHIP_SELECT_PIN 8
 #define RF95_INTERRUPT_PIN 3
 #define RF95_RESET_PIN 4
-#define VBATPIN A7 // Voltage pin to determine battery life
+#define VBATPIN A7                  // Voltage pin to determine battery life
 
-/* LoRa radio configurations */
+// LoRa radio configurations
 #define RF95_FREQUENCY 915.0         // Between 137.0 and 1020.0   (Default = 915 Mhz)
 #define RF95_TRANSMISSION_POWER 20   // Between 5 and 23           (Default = 13 Db)
 #define RF95_CAD_TIMEOUT 10000       // Greater or equal to 0      (Default = 0 ms)
@@ -36,46 +34,41 @@
 #define RF95_RESTRANSMIT_TIMEOUT 500 //                            (Default = 200 ms)
 #define RF95_GATEWAY_ID 100          // Assign unique ID to gateway
 
-/* Constants */
-#define SEALEVELPRESSURE_HPA 1013.25
-
-/* Declare functions */
-void initialize_radio();
+// Declare functions
+void printSensorHeaders();
 void printSensorValues();
 int getTemperature();
-int getPressure();
+float getPressure();
 int getAltitude();
 int getSlope();
 int getAirSpeed();
-int getHumidity();
-int getTime();
-int getElapsed();
-int getCadence();
+float getHumidity();
+int getRPM();
+void getElapsed();
+float getDistance();
 int getCDA();
 int getVelocity();
 int getPower();
 
-/* Create instance of TFT display */
+// Create instance of TFT display
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 
-/* Create an instance of the real time clock */
+// Create an instance of the real time clock
 RTCZero rtc;
 
-/* Create instance of the radio driver */
+// Create instance of the radio driver
 RH_RF95 rf95(RF95_CHIP_SELECT_PIN, RF95_INTERRUPT_PIN);
 
-/* Create instance of the packet manager */
-//RHReliableDatagram manager(rf95);
-
-/* Create instance of BME280 sensor */
+// Create instance of BME280 sensor
 Adafruit_BME280 bme;
 
-/* Declare MPU-9250 IMU device (gyrometer, accelerometer, and magnometer) */
+// Declare MPU-9250 IMU device (gyrometer, accelerometer, and magnometer)
 MPU9250_DMP imu;
 
-/* Gloabal variables */
-float batteryVoltage;
-int batteryPercent;
+// Gloabal variables
+float wheelCircumference = 0.00179;
+float prevRevolutions1, prevRevolutions2, prevRevolutions3, prevRevolutions4, prevRevolutions5;
+float currentRevolutions;
 float V_0 = 5.0; 
 float rho = 1.204; 
 int offset = 0;
@@ -84,33 +77,27 @@ int veloc_mean_size = 20;
 int zero_span = 2;
 
 void setup() {
-  /* Initialize the real time clock */
+  // Initialize the real time clock
   rtc.begin();
 
-  /* Begin TFT display */
+  // Begin TFT display
   tft.begin();
 
-  /* Initialize LoRa radio with defined configurations */
-  initialize_radio();
+  // Initialize LoRa radio with defined configurations
+  rf95.init();
+  rf95.setModemConfig(RH_RF95::Bw125Cr45Sf128); 
 
-  /* Begin BMP280 sensor */
+  // Begin BMP280 sensor
   bme.begin(0x76);
 
-  /* Begin Airspeed Sensor */
-  pinMode(A0, INPUT);
+  // Begin Airspeed Sensor
+  pinMode(A1, INPUT);
 
   // Initialize the MPU-9250 IMU device (gyrometer, accelerometer, and magnometer)
-  if (imu.begin() != INV_SUCCESS) {
-    while (true) {
-      Serial.println("Unable to communicate with MPU-9250");
-      Serial.println("Check connections, and try again.");
-      Serial.println();
-      delay(5000);
-    }
-  }  
+  imu.begin(); 
 
   for (int i = 0; i < offset_size; i++) {
-    offset += analogRead(A0)-(1023/2);
+    offset += analogRead(A1)-(1023/2);
   }
   offset /= offset_size;
 
@@ -133,6 +120,9 @@ void setup() {
 
   // Set the compass sample rate (1Hz to 100Hz)
   imu.setCompassSampleRate(10);
+
+  // Print sensor headers
+  printSensorHeaders();
 }
 
 void loop() {
@@ -143,28 +133,33 @@ void loop() {
     imu.update(UPDATE_ACCEL);
   }
 
-  /* Update display every 5 seconds */
-  if (totalSeconds % 1 == 0) {
-    printSensorValues();
-  }
+  // Get revolutions from rear feather (6 seconds)
+  prevRevolutions1 = prevRevolutions2;
+  prevRevolutions2 = prevRevolutions3;
+  prevRevolutions3 = prevRevolutions4;
+  prevRevolutions4 = prevRevolutions5;
+  prevRevolutions5 = currentRevolutions;
+  currentRevolutions = totalSeconds;
 
-  /* Delay to prevent loop from running more than once per a second */
+  // if (rf95.available()) {
+  //   // Should be a message for us now   
+  //   uint8_t buffer[10];
+  //   uint8_t length = sizeof(buffer);
+  //   if (rf95.recv(buffer, &length)) {
+  //     Serial.println((char*) buffer);
+  //   }
+  // }
+  
+  // Update and display sensor values
+  printSensorValues();
+  
+  // Delay to prevent loop from running more than once per a second
   delay(1000);
 }
 
-void initialize_radio() {
-  /* Manual reset on radio module */
-  pinMode(RF95_RESET_PIN, OUTPUT);
-  digitalWrite(RF95_RESET_PIN, LOW);
-  delay(10);
-  digitalWrite(RF95_RESET_PIN, HIGH);
-  delay(10);
-  void print_setup();
-}
-
-void printSensorValues() {
-  tft.setRotation(1);
+void printSensorHeaders() {
   tft.fillScreen(ILI9341_BLACK);
+  tft.setRotation(1);
   
   // Horizontal lines
   tft.drawLine(0, 60, 320, 60, ILI9341_GREEN);
@@ -174,101 +169,118 @@ void printSensorValues() {
   // Vertical lines
   tft.drawLine(80, 0, 80, 240, ILI9341_GREEN);
   tft.drawLine(200, 0, 200, 240, ILI9341_GREEN);
-  
-  tft.setCursor(0, 0);
-  tft.setTextSize(2);
 
-  // Line 1
+  // Sensor headers
+  tft.setTextSize(2);
   tft.setTextColor(ILI9341_GREEN);
-  tft.print(" Temp   Pressure  Altitude");
+  tft.setCursor(10, 5);
+  tft.print("Temp   Humidity  Pressure");
+  tft.setCursor(10, 65);
+  tft.print("cDa    Airspeed  Altitude");
+  tft.setCursor(10, 125);
+  tft.print("RPM    Velocity  Distance");
+  tft.setCursor(10, 185);
+  tft.print("Slope  Power     Elapsed");
+}
+
+void printSensorValues() {
   tft.setTextColor(ILI9341_WHITE);
 
-  tft.setCursor(15, 30);
+  // Temperature
+  tft.fillRect(10, 30, 65, 15, ILI9341_BLACK);
+  tft.setCursor(10, 30);
   tft.print(getTemperature());
   tft.print((char)247);
   tft.print(" C");
 
+  // Humidity
+  tft.fillRect(95, 30, 100, 15, ILI9341_BLACK);
   tft.setCursor(95, 30);
-  tft.print(getPressure());
-  tft.print(" Pa"); 
+  tft.print(getHumidity());
+  tft.print(" %");
 
+  // Pressure
+  tft.fillRect(215, 30, 100, 15, ILI9341_BLACK);
   tft.setCursor(215, 30);
-  tft.print(getAltitude());
-  tft.print(" m\n\n");
+  tft.print(getPressure());
+  tft.setTextSize(1);
+  tft.print(" kPa");
+  tft.setTextSize(2);
   
-  // Line 2
-  tft.setTextColor(ILI9341_GREEN);
-  tft.println(" Slope  Airspeed  Humidity\n");
-  tft.setTextColor(ILI9341_WHITE);
+  // cDa
+  tft.fillRect(10, 90, 65, 15, ILI9341_BLACK);
+  tft.setCursor(10, 90);
+  tft.print(getCDA());
 
-  tft.setCursor(15, 90);
-  tft.print(getSlope());
-  tft.print((char) 247);
-
-
+  // Air Speed
+  tft.fillRect(95, 90, 100, 15, ILI9341_BLACK);
   tft.setCursor(95, 90);
   tft.print(getAirSpeed());
   tft.print(" m/s");
   
+  // Altitude
+  tft.fillRect(215, 90, 100, 15, ILI9341_BLACK);
   tft.setCursor(215, 90);
-  tft.print(getHumidity());
-  tft.println("%\n");
-
-  // Line 3
-  tft.setTextColor(ILI9341_GREEN);
-  tft.println(" Time   Elapsed   Cadence\n");
-  tft.setTextColor(ILI9341_WHITE);
+  tft.print(getAltitude());
+  tft.print(" m");
   
-  tft.setCursor(15, 150);
-  tft.print(getTime());
-  tft.print((char) 247);
+  // RPM
+  tft.fillRect(10, 150, 65, 15, ILI9341_BLACK);
+  tft.setCursor(10, 150);
+  tft.print(getRPM());
   
+  // Velocity
+  tft.fillRect(95, 150, 100, 15, ILI9341_BLACK);
   tft.setCursor(95, 150);
-  tft.print(getAirSpeed());
-  tft.print(" km/h");
-  
-  tft.setCursor(215, 150);
-  tft.print(getCadence());
-  tft.println(" rpm\n");
-
-  // Line 4
-  tft.setTextColor(ILI9341_GREEN);
-  tft.println(" cDa    Velocity  Power\n");
-  tft.setTextColor(ILI9341_WHITE);
-  
-  tft.setCursor(15, 210);
-  tft.print(getCDA());
-  
-  tft.setCursor(95, 210);
   tft.print(getVelocity());
   tft.print(" km/h");
 
-  tft.setCursor(215, 210);
+  // Distance
+  tft.fillRect(215, 150, 100, 15, ILI9341_BLACK);
+  tft.setCursor(215, 150);
+  tft.print(getDistance());
+  tft.print(" km");
+
+  // Slope
+  tft.fillRect(10, 210, 65, 15, ILI9341_BLACK);
+  tft.setCursor(10, 210);
+  tft.print(getSlope());
+  tft.print((char) 247);
+
+  // Power
+  tft.fillRect(95, 210, 100, 15, ILI9341_BLACK);
+  tft.setCursor(95, 210);
   tft.print(getPower());
   tft.println(" w");
+  
+  // Elapsed
+  tft.fillRect(215, 210, 100, 15, ILI9341_BLACK);
+  tft.setCursor(215, 210);
+  getElapsed();
 }
 
+// Getter functions
 int getTemperature() {
   return bme.readTemperature();
 }
 
-int getPressure() {
-  return bme.readPressure()/100;
+float getPressure() {
+  float pa = bme.readPressure();
+  float kpa = pa / 1000;
+  return kpa;
 }
 
 int getAltitude() {
-  return 530;
+  return bme.readAltitude(1013.25);
 }
 
-int getSlope() {
-  int accelX = imu.calcAccel(imu.ax);
-  int slope = accelX * 90;
-  return slope;
+int getCDA() {
+  return  0;
 }
 
 int getAirSpeed() {
-  
-  float adc_avg = 0; float veloc = 0.0;
+  float adc_avg = 0;
+  float airSpeed = 0.0;
   
   for (int ii=0;ii<veloc_mean_size;ii++){
     adc_avg+= analogRead(A0)-offset;
@@ -279,39 +291,47 @@ int getAirSpeed() {
   if (adc_avg>512-zero_span and adc_avg<512+zero_span){
   } else{
     if (adc_avg<512){
-      veloc = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
+      airSpeed = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
     } else{
-      veloc = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
+      airSpeed = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
     }
   }
-  return veloc;
+
+  return 0;
 }
 
-int getHumidity() {
+float getHumidity() {
   return bme.readHumidity();
 }
 
-int getTime() {
-  return 1;
-}
-
-int getElapsed() {
-  int elapsed = rtc.getSeconds();
-  return elapsed;
-}
-
-int getCadence() {
-  return 60;
-}
-
-int getCDA() {
-  return  50;
+int getRPM() {
+  float rps = (currentRevolutions - prevRevolutions1) / 6;
+  return (rps * 60);
 }
 
 int getVelocity() {
-  return 30;
+  float rph = (currentRevolutions - prevRevolutions1) / 6 * 3600;
+  return rph * wheelCircumference;
+}
+
+float getDistance() {
+  return currentRevolutions * wheelCircumference;
+}
+
+int getSlope() {
+  float accelX = imu.calcAccel(imu.ax);
+  int slope = accelX * 90;
+  return slope;
 }
 
 int getPower() {
-  return 600;
+  return 0;
+}
+
+void getElapsed() {
+  tft.print(rtc.getHours());
+  tft.print(":");
+  tft.print(rtc.getMinutes());
+  tft.print(":");
+  tft.print(rtc.getSeconds());
 }
