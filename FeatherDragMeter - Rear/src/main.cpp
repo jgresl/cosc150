@@ -30,6 +30,7 @@
 
 /* Declare functions */
 void initialize_radio();
+float getPedalForce();
 
 /* Create an instance of the real time clock */
 RTCZero rtc;

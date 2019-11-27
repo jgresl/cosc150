@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <RH_RF95.h>
+  #include <RH_RF95.h>
 #include <rtcZero.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
@@ -59,14 +59,15 @@ MPU9250_DMP imu;
 float wheelCircumference = 0.00179;
 float currentRevolutions = 0, prevRevolutions1 = 0, prevRevolutions2 = 0, prevRevolutions3 = 0, prevRevolutions4 = 0, prevRevolutions5 = 0;
 
-// float V_0 = 5.0; 
-// float rho = 1.204; 
-// int offset = 0;
-// int offset_size = 10;
-// int veloc_mean_size = 20;
-// int zero_span = 2;
+ float V_0 = 5.0; 
+ float rho = 1.204; 
+ int offset = 0;
+ int offset_size = 10;
+ int veloc_mean_size = 20;
+ int zero_span = 2;
 
 void setup() {
+  Serial.begin(9600);
   // Initialize the real time clock
   rtc.begin();
 
@@ -86,10 +87,10 @@ void setup() {
   // Initialize the MPU-9250 IMU device (gyrometer, accelerometer, and magnometer)
   imu.begin(); 
 
-  // for (int i = 0; i < offset_size; i++) {
-  //   offset += analogRead(A1)-(1023/2);
-  // }
-  // offset /= offset_size;
+   for (int i = 0; i < offset_size; i++) {
+     offset += analogRead(A1)-(1023/2);
+   }
+   offset /= offset_size;
 
   // Enable all MPU-9250 sensors:
   // imu.setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
@@ -141,9 +142,29 @@ void loop() {
   //     Serial.println((char*) buffer);
   //   }
   // }
+    float adc_avg = 0; float veloc = 0.0;
   
+// average a few ADC readings for stability
+  for (int ii=0;ii<veloc_mean_size;ii++){
+    adc_avg+= analogRead(A1)-offset;
+  }
+  adc_avg/=veloc_mean_size;
+  
+  // make sure if the ADC reads below 512, then we equate it to a negative velocity
+  if (adc_avg>512-zero_span and adc_avg<512+zero_span){
+  } else{
+    if (adc_avg<512){
+      veloc = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
+    } else{
+      veloc = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
+    }
+  }
   // Update and display sensor values
-  printSensorValues();
+  printSensorValues(veloc);
+
+
+   // print velocity
+   // delay for stability
   
   // Delay to prevent loop from running more than once per a second
   delay(1000);
@@ -175,7 +196,7 @@ void printSensorHeaders() {
   tft.print("Slope  Power     Elapsed");
 }
 
-void printSensorValues() {
+void printSensorValues(float airspeed) {
   tft.setTextColor(ILI9341_WHITE);
 
   // Temperature
@@ -207,7 +228,7 @@ void printSensorValues() {
   // Air Speed
   tft.fillRect(95, 90, 100, 15, ILI9341_BLACK);
   tft.setCursor(95, 90);
-  tft.print(getAirSpeed());
+  tft.print(airspeed;
   tft.print(" m/s");
   
   // Altitude
@@ -271,23 +292,23 @@ int getCDA() {
 }
 
 int getAirSpeed() {
-  // float adc_avg = 0;
-  // float airSpeed = 0.0;
+   float adc_avg = 0;
+   float airSpeed = 0.0;
   
-  // for (int ii=0;ii<veloc_mean_size;ii++){
-  //   adc_avg+= analogRead(A0)-offset;
-  // }
-  // adc_avg/=veloc_mean_size;
+   for (int ii=0;ii<veloc_mean_size;ii++){
+     adc_avg+= analogRead(A1)-offset;
+   }
+   adc_avg/=veloc_mean_size;
   
   
-  // if (adc_avg>512-zero_span and adc_avg<512+zero_span){
-  // } else{
-  //   if (adc_avg<512){
-  //     airSpeed = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
-  //   } else{
-  //     airSpeed = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
-  //   }
-  // }
+   if (adc_avg>512-zero_span and adc_avg<512+zero_span){
+   } else{
+     if (adc_avg<512){
+       airSpeed = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
+     } else{
+       airSpeed = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
+     }
+   }
 
   return 0;
 }
