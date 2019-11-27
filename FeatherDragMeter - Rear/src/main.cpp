@@ -8,6 +8,12 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <SparkFunMPU9250-DMP.h>
+#include <HX711.h>
+
+#define DOUT  3
+#define CLK  2
+
+HX711 scale;
 
 /* Feather M0 wiring configurations */
 #define RF95_CHIP_SELECT_PIN 8
@@ -41,6 +47,7 @@ RH_RF95 rf95(RF95_CHIP_SELECT_PIN, RF95_INTERRUPT_PIN);
 /* Gloabal variables */
 float batteryVoltage;
 int batteryPercent;
+float calibration_factor = -7050;
 
 void setup()
 {
@@ -50,6 +57,12 @@ void setup()
   /* Initialize LoRa radio with defined configurations */
   rf95.init();
   rf95.setModemConfig(RH_RF95::Bw125Cr45Sf128); 
+
+  scale.begin(DOUT, CLK);
+  scale.set_scale();
+  scale.tare(); //Reset the scale to 0
+
+  long zero_factor = scale.read_average(); //Get a baseline reading
 }
 
 void loop() {
@@ -57,7 +70,17 @@ void loop() {
   Serial.println("Sending revolutions to display");
   uint8_t data[] = "hELLO";
   rf95.send(data, sizeof(data));
+  
+
 
   /* Delay to prevent loop from running more than once per a second */
   delay(1000);
+}
+float getPedalForce(){
+  scale.set_scale(calibration_factor); //Adjust to this calibration factor
+  float mass = scale.get_units();
+  if(0>mass){
+mass = 0;
+  }
+  return mass * 0.453592 * 9.81;
 }
