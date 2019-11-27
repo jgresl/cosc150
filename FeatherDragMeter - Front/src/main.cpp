@@ -19,20 +19,10 @@
 #define RF95_CHIP_SELECT_PIN 8
 #define RF95_INTERRUPT_PIN 3
 #define RF95_RESET_PIN 4
-#define VBATPIN A7                  // Voltage pin to determine battery life
 
 // LoRa radio configurations
 #define RF95_FREQUENCY 915.0         // Between 137.0 and 1020.0   (Default = 915 Mhz)
-#define RF95_TRANSMISSION_POWER 20   // Between 5 and 23           (Default = 13 Db)
-#define RF95_CAD_TIMEOUT 10000       // Greater or equal to 0      (Default = 0 ms)
-#define RF95_SPREADING_FACTOR 12     // Between 6 and 12           (Default = ?)             --> Overwritten by setModemConfig()
-#define RF95_BANDWIDTH 125000        // Between 7800 and 500000    (Default = 125000 Hz)     --> Overwritten by setModemConfig()
-#define RF95_PREAMBLE_LENGTH 8       //                            (Default = 8)
-#define RF95_SYNC_WORD 0x39          //                            (Default = 0x39)
-#define RF95_CODING_RATE 5           // Between 5 and 8            (Default = 5-bit)         --> Overwritten by setModemConfig()
-#define RF95_RESTRANSMIT_RETRIES 3   //                            (Default = 3)
-#define RF95_RESTRANSMIT_TIMEOUT 500 //                            (Default = 200 ms)
-#define RF95_GATEWAY_ID 100          // Assign unique ID to gateway
+#define RF95_TRANSMISSION_POWER 5    // Between 5 and 23           (Default = 13 Db)
 
 // Declare functions
 void printSensorHeaders();
@@ -67,14 +57,14 @@ MPU9250_DMP imu;
 
 // Gloabal variables
 float wheelCircumference = 0.00179;
-float prevRevolutions1, prevRevolutions2, prevRevolutions3, prevRevolutions4, prevRevolutions5;
-float currentRevolutions;
-float V_0 = 5.0; 
-float rho = 1.204; 
-int offset = 0;
-int offset_size = 10;
-int veloc_mean_size = 20;
-int zero_span = 2;
+float currentRevolutions = 0, prevRevolutions1 = 0, prevRevolutions2 = 0, prevRevolutions3 = 0, prevRevolutions4 = 0, prevRevolutions5 = 0;
+
+// float V_0 = 5.0; 
+// float rho = 1.204; 
+// int offset = 0;
+// int offset_size = 10;
+// int veloc_mean_size = 20;
+// int zero_span = 2;
 
 void setup() {
   // Initialize the real time clock
@@ -96,16 +86,18 @@ void setup() {
   // Initialize the MPU-9250 IMU device (gyrometer, accelerometer, and magnometer)
   imu.begin(); 
 
-  for (int i = 0; i < offset_size; i++) {
-    offset += analogRead(A1)-(1023/2);
-  }
-  offset /= offset_size;
+  // for (int i = 0; i < offset_size; i++) {
+  //   offset += analogRead(A1)-(1023/2);
+  // }
+  // offset /= offset_size;
 
   // Enable all MPU-9250 sensors:
-  imu.setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
+  // imu.setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
+  imu.setSensors(INV_XYZ_ACCEL);
+
 
   // Set the gyroscope full scall range (+/- 250, 500, 1000, or 2000 dps)
-  imu.setGyroFSR(2000);
+  // imu.setGyroFSR(2000);
 
   // Set the accelerometer full scale range (+/- 2, 4, 8, or 16 g)
   imu.setAccelFSR(2);
@@ -113,13 +105,13 @@ void setup() {
   // The magnetometer full scale range is preset to +/- 4912 uT (micro-tesla's)
 
   // Set the digital low-pass filter of the accelerometer and gyroscope (88, 98, 42, 20, 10, or 5 Hz)
-  imu.setLPF(5);
+  // imu.setLPF(5);
 
   // Set the accellerometer and gyroscope sample rate (4Hz to 1kHz)
-  imu.setSampleRate(10);
+  // imu.setSampleRate(10);
 
   // Set the compass sample rate (1Hz to 100Hz)
-  imu.setCompassSampleRate(10);
+  // imu.setCompassSampleRate(10);
 
   // Print sensor headers
   printSensorHeaders();
@@ -279,23 +271,23 @@ int getCDA() {
 }
 
 int getAirSpeed() {
-  float adc_avg = 0;
-  float airSpeed = 0.0;
+  // float adc_avg = 0;
+  // float airSpeed = 0.0;
   
-  for (int ii=0;ii<veloc_mean_size;ii++){
-    adc_avg+= analogRead(A0)-offset;
-  }
-  adc_avg/=veloc_mean_size;
+  // for (int ii=0;ii<veloc_mean_size;ii++){
+  //   adc_avg+= analogRead(A0)-offset;
+  // }
+  // adc_avg/=veloc_mean_size;
   
   
-  if (adc_avg>512-zero_span and adc_avg<512+zero_span){
-  } else{
-    if (adc_avg<512){
-      airSpeed = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
-    } else{
-      airSpeed = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
-    }
-  }
+  // if (adc_avg>512-zero_span and adc_avg<512+zero_span){
+  // } else{
+  //   if (adc_avg<512){
+  //     airSpeed = -sqrt((-10000.0*((adc_avg/1023.0)-0.5))/rho);
+  //   } else{
+  //     airSpeed = sqrt((10000.0*((adc_avg/1023.0)-0.5))/rho);
+  //   }
+  // }
 
   return 0;
 }
@@ -329,9 +321,15 @@ int getPower() {
 }
 
 void getElapsed() {
+  if (rtc.getHours() < 10)
+    tft.print("0");
   tft.print(rtc.getHours());
   tft.print(":");
+  if(rtc.getMinutes() < 10)
+    tft.print("0");
   tft.print(rtc.getMinutes());
   tft.print(":");
+  if(rtc.getSeconds() < 10)
+    tft.print("0");
   tft.print(rtc.getSeconds());
 }
